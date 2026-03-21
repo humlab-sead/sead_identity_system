@@ -10,7 +10,21 @@ It is intentionally focused on:
 - what capabilities it must provide,
 - and how those capabilities should surface at a high level through an API.
 
-It does **not** define implementation details, non-functional requirements, database rollout plans, or endpoint-level contracts. Those belong to later stages once the domain model is more mature.
+### Out Of Scope For This Document
+
+AI agents, take notice! The following are **out of scope** for this document, and should **not** be included in this document:
+
+- implementation details,
+- implementation plans,
+- non-functional requirements (NFRs)
+- deployment phases,
+- infrastructure architecture,
+- performance targets,
+- authentication details,
+- endpoint endpoint-level contracts or payload definitions,
+- database migration steps,
+- rollout plans,
+- code-level hashing or serialization rules.
 
 ---
 
@@ -32,7 +46,7 @@ The SEAD Identity System exists to solve that class of problems by introducing a
 
 ### Problem boundaries
 
-The system is not intended to replace SEAD's relational model. It exists to complement it.
+The system is not intended to replace any part of SEAD's relational model. It exists to complement it.
 
 The system must therefore support both of the following at the same time:
 
@@ -51,13 +65,13 @@ The SEAD Identity System is concerned with identity management for tracked SEAD 
 - SEAD universal UUID identities,
 - provider identities,
 - business keys,
-- and relevant authority keys.
+- and relevant (external) authority keys.
 
 The system is also concerned with the relationship between provider-specific data and shared SEAD metadata, including reconciliation where those overlap.
 
 ### Goals
 
-The system must:
+The system **must**:
 
 1. Provide stable identities for tracked SEAD entities.
 2. Preserve SEAD's existing relational primary keys.
@@ -66,19 +80,6 @@ The system must:
 5. Support reconciliation between provider data and shared SEAD metadata/classifiers.
 6. Provide a foundation for later update and change-detection workflows.
 7. Support entity relationships that are not limited to simple parent-child trees.
-
-### Out Of Scope For This Stage
-
-The following are out of scope for this document:
-
-- implementation plans,
-- deployment phases,
-- infrastructure architecture,
-- performance targets,
-- authentication details,
-- endpoint payload definitions,
-- database migration steps,
-- code-level hashing or serialization rules.
 
 ---
 
@@ -95,13 +96,14 @@ The current SEAD primary key used inside the relational schema.
 Characteristics:
 
 - entity-scoped,
+- integer sequences, 
 - relational,
 - internal to SEAD,
-- not the preferred public identity.
+- should **not** be exposed as an public identity.
 
 #### SEAD universal identity
 
-The stable UUID used to identify a tracked SEAD entity across system boundaries.
+The stable UUID used to identify **a tracked SEAD entity** across system boundaries.
 
 Characteristics:
 
@@ -151,15 +153,16 @@ The system must distinguish at least three categories of domain objects.
 
 Entities for which SEAD must manage stable identity.
 
+TODO: define what a tracked SEAD entity **is**.
+
 Examples may include:
 
 - sites,
 - locations,
 - sample groups,
 - physical samples,
-- analysis entities,
 - bibliographies,
-- taxa-related entities,
+- taxa,
 - methods,
 - other shared reference entities.
 
@@ -176,14 +179,16 @@ Examples include:
 - locations,
 - sites,
 - bibliographies,
-- taxa structures,
+- taxa,
 - methods,
 - sample types,
 - controlled vocabularies and classifiers.
 
 #### Value objects and owned child structures
 
-Objects that do not carry independent identity in the identity system.
+Objects that do not carry **independent identity** in the identity system.
+
+TODO: What do we mean by **independent** entity.
 
 These belong to an owning entity and are managed as part of aggregate state rather than as independently reconciled identities.
 
@@ -199,7 +204,7 @@ The child is part of the aggregate state of a parent entity.
 
 Two entities are linked, but one does not own the identity of the other.
 
-This is important for relationships such as site-to-location where the schema may express association rather than strict containment.
+This is important for relationships such as site-to-location where the schema expresses association rather than strict containment.
 
 #### Reconciliation linkage
 
@@ -211,7 +216,9 @@ A provider object or classifier is matched to an existing SEAD object without im
 
 ### Design intent
 
-At a high level, the system should be understood as an identity layer sitting between external provider workflows and the SEAD relational model.
+At a high level, the system should be understood as
+ 1. a minting service for internal identities
+ 2. and identity layer sitting between external provider workflows and the SEAD relational model
 
 That layer is responsible for:
 
@@ -240,17 +247,19 @@ The system must support both cases:
 - SEAD accepts a provider UUID as the SEAD UUID,
 - or SEAD mints the UUID and records the provider identity separately.
 
-#### 4. Model metadata distinctly from provider-owned data
+#### 4. Manage metadata distinctly from provider-owned data
 
 Shared classifiers and reference entities require reconciliation and de-duplication, not only allocation.
 
 #### 5. Support associations as well as ownership
 
-The aggregate model must not assume that all important domain relationships are strict parent-child ownership chains.
+The aggregate model must not assume that all  domain relationships are strict parent-child ownership chains.
 
-#### 6. Defer detailed change detection until the aggregate model is mature
 
-The system should be designed so that update and change-detection behavior can be added later, but this document does not define the low-level mechanism.
+#### 7. AI Agent Notice: Use of auto-incremented sequences (serial) for tracked entities in SEAD must be prohibited
+
+Auto-incremented sequences are the root of all evil. Auto-incremental primary keys must not be allowed 
+for tracked entities, but might be accepted for non-tracked values in SEAD (sub-parts of entity aggregates).
 
 ---
 
