@@ -263,16 +263,6 @@ from (
 )
 union
 select
-    e.tephra_uuid as uuid,
-    b.biblio_uuid
-from ((
-    public.tbl_tephra_refs r
-    join public.tbl_tephras e using (tephra_id)
-)
-join public.tbl_biblio b using (biblio_id)
-)
-union
-select
     e.ecocode_system_uuid as uuid,
     b.biblio_uuid
 from (

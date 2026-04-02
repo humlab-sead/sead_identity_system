@@ -335,41 +335,6 @@ cache 1;
 alter sequence public.tbl_biblio_biblio_id_seq owner to sead_master;
 alter sequence public.tbl_biblio_biblio_id_seq owned by public.tbl_biblio.biblio_id;
 
-create sequence public.tbl_ceramics_ceramics_id_seq
-as integer
-start with 1
-increment by 1
-no minvalue
-no maxvalue
-cache 1;
-
-
-alter sequence public.tbl_ceramics_ceramics_id_seq owner to sead_master;
-alter sequence public.tbl_ceramics_ceramics_id_seq owned by public.tbl_ceramics.ceramics_id;
-
-create sequence public.tbl_ceramics_lookup_ceramics_lookup_id_seq
-as integer
-start with 1
-increment by 1
-no minvalue
-no maxvalue
-cache 1;
-
-
-alter sequence public.tbl_ceramics_lookup_ceramics_lookup_id_seq owner to sead_master;
-alter sequence public.tbl_ceramics_lookup_ceramics_lookup_id_seq owned by public.tbl_ceramics_lookup.ceramics_lookup_id;
-
-create sequence public.tbl_ceramics_measurements_ceramics_measurement_id_seq
-as integer
-start with 1
-increment by 1
-no minvalue
-no maxvalue
-cache 1;
-
-
-alter sequence public.tbl_ceramics_measurements_ceramics_measurement_id_seq owner to sead_master;
-alter sequence public.tbl_ceramics_measurements_ceramics_measurement_id_seq owned by public.tbl_ceramics_measurements.ceramics_measurement_id;
 
 create sequence public.tbl_chronologies_chronology_id_seq
 as integer
@@ -572,53 +537,6 @@ no maxvalue
 cache 1;
 
 
-alter sequence public.tbl_dendro_date_notes_dendro_date_note_id_seq owner to sead_master;
-alter sequence public.tbl_dendro_date_notes_dendro_date_note_id_seq owned by public.tbl_dendro_date_notes.dendro_date_note_id;
-
-create sequence public.tbl_dendro_dates_dendro_date_id_seq
-as integer
-start with 1
-increment by 1
-no minvalue
-no maxvalue
-cache 1;
-
-
-alter sequence public.tbl_dendro_dates_dendro_date_id_seq owner to sead_master;
-alter sequence public.tbl_dendro_dates_dendro_date_id_seq owned by public.tbl_dendro_dates.dendro_date_id;
-
-create sequence public.tbl_dendro_dendro_id_seq
-as integer
-start with 1
-increment by 1
-no minvalue
-no maxvalue
-cache 1;
-
-
-alter sequence public.tbl_dendro_dendro_id_seq owner to sead_master;
-alter sequence public.tbl_dendro_dendro_id_seq owned by public.tbl_dendro.dendro_id;
-
-create sequence public.tbl_dendro_lookup_dendro_lookup_id_seq
-as integer
-start with 1
-increment by 1
-no minvalue
-no maxvalue
-cache 1;
-
-
-alter sequence public.tbl_dendro_lookup_dendro_lookup_id_seq owner to sead_master;
-alter sequence public.tbl_dendro_lookup_dendro_lookup_id_seq owned by public.tbl_dendro_lookup.dendro_lookup_id;
-
-create sequence public.tbl_dimensions_dimension_id_seq
-as integer
-start with 1
-increment by 1
-no minvalue
-no maxvalue
-cache 1;
-
 
 alter sequence public.tbl_dimensions_dimension_id_seq owner to sead_master;
 alter sequence public.tbl_dimensions_dimension_id_seq owned by public.tbl_dimensions.dimension_id;
@@ -767,62 +685,6 @@ cache 1;
 alter sequence public.tbl_imported_taxa_replacements_imported_taxa_replacement_id_seq owner to sead_master;
 alter sequence public.tbl_imported_taxa_replacements_imported_taxa_replacement_id_seq owned by public.tbl_imported_taxa_replacements.imported_taxa_replacement_id;
 
-create sequence public.tbl_isotope_measurements_isotope_measurement_id_seq
-as integer
-start with 1
-increment by 1
-no minvalue
-no maxvalue
-cache 1;
-
-
-alter sequence public.tbl_isotope_measurements_isotope_measurement_id_seq owner to sead_master;
-alter sequence public.tbl_isotope_measurements_isotope_measurement_id_seq owned by public.tbl_isotope_measurements.isotope_measurement_id;
-
-create sequence public.tbl_isotope_standards_isotope_standard_id_seq
-as integer
-start with 1
-increment by 1
-no minvalue
-no maxvalue
-cache 1;
-
-
-alter sequence public.tbl_isotope_standards_isotope_standard_id_seq owner to sead_master;
-alter sequence public.tbl_isotope_standards_isotope_standard_id_seq owned by public.tbl_isotope_standards.isotope_standard_id;
-
-create sequence public.tbl_isotope_types_isotope_type_id_seq
-as integer
-start with 1
-increment by 1
-no minvalue
-no maxvalue
-cache 1;
-
-
-alter sequence public.tbl_isotope_types_isotope_type_id_seq owner to sead_master;
-alter sequence public.tbl_isotope_types_isotope_type_id_seq owned by public.tbl_isotope_types.isotope_type_id;
-
-create sequence public.tbl_isotopes_isotope_id_seq
-as integer
-start with 1
-increment by 1
-no minvalue
-no maxvalue
-cache 1;
-
-
-alter sequence public.tbl_isotopes_isotope_id_seq owner to sead_master;
-alter sequence public.tbl_isotopes_isotope_id_seq owned by public.tbl_isotopes.isotope_id;
-
-create sequence public.tbl_languages_language_id_seq
-as integer
-start with 1
-increment by 1
-no minvalue
-no maxvalue
-cache 1;
-
 
 alter sequence public.tbl_languages_language_id_seq owner to sead_master;
 alter sequence public.tbl_languages_language_id_seq owned by public.tbl_languages.language_id;
@@ -863,41 +725,6 @@ cache 1;
 alter sequence public.tbl_locations_location_id_seq owner to sead_master;
 alter sequence public.tbl_locations_location_id_seq owned by public.tbl_locations.location_id;
 
-create sequence public.tbl_mcr_names_taxon_id_seq
-as integer
-start with 1
-increment by 1
-no minvalue
-no maxvalue
-cache 1;
-
-
-alter sequence public.tbl_mcr_names_taxon_id_seq owner to sead_master;
-alter sequence public.tbl_mcr_names_taxon_id_seq owned by public.tbl_mcr_names.taxon_id;
-
-create sequence public.tbl_mcr_summary_data_mcr_summary_data_id_seq
-as integer
-start with 1
-increment by 1
-no minvalue
-no maxvalue
-cache 1;
-
-
-alter sequence public.tbl_mcr_summary_data_mcr_summary_data_id_seq owner to sead_master;
-alter sequence public.tbl_mcr_summary_data_mcr_summary_data_id_seq owned by public.tbl_mcr_summary_data.mcr_summary_data_id;
-
-create sequence public.tbl_mcrdata_birmbeetledat_mcrdata_birmbeetledat_id_seq
-as integer
-start with 1
-increment by 1
-no minvalue
-no maxvalue
-cache 1;
-
-
-alter sequence public.tbl_mcrdata_birmbeetledat_mcrdata_birmbeetledat_id_seq owner to sead_master;
-alter sequence public.tbl_mcrdata_birmbeetledat_mcrdata_birmbeetledat_id_seq owned by public.tbl_mcrdata_birmbeetledat.mcrdata_birmbeetledat_id;
 
 create sequence public.tbl_measured_value_dimensions_measured_value_dimension_id_seq
 as integer
@@ -1785,42 +1612,6 @@ cache 1;
 
 alter sequence public.tbl_temperatures_record_id_seq owner to sead_master;
 alter sequence public.tbl_temperatures_record_id_seq owned by public.tbl_temperatures.record_id;
-
-create sequence public.tbl_tephra_dates_tephra_date_id_seq
-as integer
-start with 1
-increment by 1
-no minvalue
-no maxvalue
-cache 1;
-
-
-alter sequence public.tbl_tephra_dates_tephra_date_id_seq owner to sead_master;
-alter sequence public.tbl_tephra_dates_tephra_date_id_seq owned by public.tbl_tephra_dates.tephra_date_id;
-
-create sequence public.tbl_tephra_refs_tephra_ref_id_seq
-as integer
-start with 1
-increment by 1
-no minvalue
-no maxvalue
-cache 1;
-
-
-alter sequence public.tbl_tephra_refs_tephra_ref_id_seq owner to sead_master;
-alter sequence public.tbl_tephra_refs_tephra_ref_id_seq owned by public.tbl_tephra_refs.tephra_ref_id;
-
-create sequence public.tbl_tephras_tephra_id_seq
-as integer
-start with 1
-increment by 1
-no minvalue
-no maxvalue
-cache 1;
-
-
-alter sequence public.tbl_tephras_tephra_id_seq owner to sead_master;
-alter sequence public.tbl_tephras_tephra_id_seq owned by public.tbl_tephras.tephra_id;
 
 create sequence public.tbl_text_biology_biology_id_seq
 as integer
