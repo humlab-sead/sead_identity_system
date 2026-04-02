@@ -2,596 +2,265 @@
 
 ## Scope
 
-This assessment is based on the current draft material in:
+This assessment evaluates the implementation-readiness of the SEAD Identity System based on the current state of:
 
-- `docs/aggregate_model/`
-- `docs/bugs_cep/`
-- `docs/sead/`
-- `docs/`
+- [REQUIREMENTS.md](./REQUIREMENTS.md) — functional requirements (25 FRs, 4 scenarios)
+- [DESIGN_VIEW.md](./DESIGN_VIEW.md) — design rules and architectural decisions
+- [IMPLEMENTATION_VIEW.md](./IMPLEMENTATION_VIEW.md) — storage design, core operations, rollout strategy
 
-The purpose of the proposed system is sound: provide stable identity links between foreign systems and SEAD while preserving SEAD's existing integer primary keys.
+It replaces the earlier assessment. The documents have been substantially revised since that assessment was written.
 
 ---
 
 ## Overall Assessment
 
-The current design is in a good **conceptual design** state, but not yet in a fully consistent **implementation-ready** state.
+The proposal has moved from a loose collection of ideas to a **coherent three-layer specification**: requirements define what the system must do, the systems design constrains how, and the implementation view specifies concrete structures.
 
-The strongest part of the proposal is the core architectural idea:
+The document chain is internally consistent and largely free of redundancy. Identity terminology is now precise (five identity types, three entity subtypes, three relationship types). The design rules are crisp. The Resolve → Allocate → Map decision flow is well defined. The implementation view provides concrete DDL, operation interfaces, and a phased rollout.
 
-- treat identity as a concern for **entities / aggregate roots** rather than every row,
-- keep SEAD integer keys for internal relational use,
-- introduce stable external identity for cross-system coordination,
-- support idempotent allocation so the same external identity resolves to the same SEAD entity.
+**However, the proposal is not yet implementation-ready.** Several structural design questions remain unresolved, and until they are answered, the implementation structures in the third document cannot be validated against the real SEAD schema.
 
-That is a strong direction and it fits the stated domain rule well: update the entity row, but replace child/value-object rows rather than tracking identity for those children individually.
+The remaining gaps cluster into two categories:
 
-However, the current drafts still have important gaps and contradictions:
-
-- some of the design documentation does not match the actual SEAD schema,
-- the boundary between **canonical SEAD identity** and **provider-supplied identity** is not fully resolved,
-- update semantics are described conceptually but not yet specified precisely enough for implementation,
-- parts of the implementation and NFR drafts are more detailed than the core domain model currently justifies.
-
-My conclusion is that the project has a solid foundation, but it still needs another design pass before implementation should begin.
-
-I also agree with the decision to **stash the implementation plan for now**. At the current maturity level, the right priority is:
-
-- define the SEAD entity model,
-- decide aggregate boundaries,
-- distinguish entities from shared metadata and classifiers,
-- define identity terms and reconciliation rules,
-- then return to implementation planning.
+1. **Domain modeling gaps** — which SEAD objects are tracked entities, what their aggregate boundaries are, and how reconciliation works in practice.
+2. **Identity model gaps** — where the SEAD universal identity (UUID) actually lives, and how it relates to the external_id stored in the allocation registry.
 
 ---
 
-## What Is Already Strong
+## What Is Now Strong
 
-### 1. The problem statement is correct
+### 1. Clean document chain with no redundancy
 
-The design correctly identifies the main failure mode in the current SEAD model:
+Each document has a clear role. Requirements does not leak implementation. Systems design does not restate requirements. Implementation view does not restate design rules. Cross-references are correct.
 
-- integer sequence keys are local database identifiers,
-- they are allocated late,
-- they are poor cross-system identifiers,
-- they do not provide a stable basis for idempotent re-submission or update handling.
+### 2. Precise identity vocabulary
 
-That diagnosis is accurate and well supported by both the SIMS drafts and the BUGS/CEP example.
+The five identity types (SEAD internal, SEAD universal, business key, provider key, authority key) are now defined with clear characteristics. The earlier assessment flagged blurred terminology as the most important unresolved issue. That is largely fixed.
 
-### 2. Aggregate-focused identity is the right abstraction
+### 3. Entity subtypes grounded in DDD
 
-The decision to track identity for **entities / aggregate roots**, but not for child value objects, is the best part of the design.
+The provider-owned / shared-metadata / relationship distinction is new and directly addresses the earlier gap around classifiers and shared metadata. The mapping to Shape Shifter terminology (fact, classifier/lookup, bridge) creates a useful bridge between the two systems.
 
-This gives the system a clear operational rule:
+### 4. Administrable identity policy
 
-- the aggregate root has stable identity,
-- owned children are part of the aggregate state,
-- updates replace child collections instead of attempting row-by-row identity matching.
+FR-11 now explicitly requires an administrable policy governing when a provider UUID is accepted as the SEAD universal identity. The earlier assessment identified this as the critical missing governance rule. It is now a stated requirement with design support (policy boundary between Resolve and Allocate).
 
-This is a good fit for SEAD because much of the churn and ambiguity appears below the main submission entities rather than at the entity root itself.
+### 5. Unresolved reconciliation state
 
-### 3. The hybrid UUID + natural-key approach is pragmatic
+FR-20 now requires the system to surface unresolved state rather than silently allocating a new identity for shared metadata. This directly addresses the earlier concern about classifier duplication.
 
-Supporting both:
+### 6. Many-to-many relationship support
 
-- UUID for technically capable providers, and
-- natural keys for legacy or spreadsheet-driven providers
+FR-18 and the association relationship type address the site/location modeling problem. The design no longer forces all relationships into parent-child ownership hierarchies.
 
-is a practical design choice.
+### 7. The implementation view is concrete
 
-If the system required UUID only, adoption would be harder. If it relied on natural keys only, stability would be weaker. The hybrid model is therefore sensible.
-
-### 4. The central mapping concept is sound
-
-The proposed allocation registry is a good core pattern because it gives you:
-
-- idempotent allocation,
-- auditability,
-- submission grouping,
-- rollback support,
-- a future hook for change detection.
-
-The BUGS/CEP trace table is a useful historical proof that this class of approach works in practice.
-
-### 5. Separating SIMS from Shape Shifter is a good boundary
-
-Treating SIMS as a separate SEAD-side service and Shape Shifter as a client is the right architectural boundary.
-
-That keeps:
-
-- identity policy in one place,
-- ingestion and normalization logic in another,
-- long-term identity governance independent of any single ingester implementation.
+DDL exists for the allocation registry and submission tracker. Core operations are specified as interfaces with clear behavior contracts. The submission lifecycle is an explicit state machine. The API surface is defined as a table of endpoints. The rollout is phased.
 
 ---
 
-## Main Weaknesses And Gaps
+## Remaining Gaps
 
-### 1. The docs are not yet internally consistent
+### Gap 1: The SEAD universal identity has no clear home
 
-The drafts are aligned at the intent level, but not yet at the schema level.
+This is the most significant structural issue remaining.
 
-The biggest issue is that some entity dependency statements in the aggregate-model docs do not match the SEAD DDL.
+The requirements define two distinct identity types for every tracked entity:
 
-Examples from the actual schema:
+- **SEAD internal identity** — the integer PK (`{entity}_id`)
+- **SEAD universal identity** — a stable UUID (`{entity}_uuid`)
 
-- `tbl_sample_groups.site_id -> tbl_sites.site_id`
-- `tbl_physical_samples.sample_group_id -> tbl_sample_groups.sample_group_id`
-- `tbl_analysis_entities.physical_sample_id -> tbl_physical_samples.physical_sample_id`
+The implementation view's central table (`identity_allocations`) maps `external_id` → `alloc_integer_id`. The entity table extensions add `{entity}_external_id` columns. But `external_id` is the *provider's* identifier, not the SEAD universal identity.
 
-Those support the proposed aggregate chain reasonably well.
+This leaves an unresolved question: **where does the SEAD-minted UUID live?**
 
-But the location/site relationship is different from what the aggregate draft implies:
+Consider the case where a provider supplies only a business key and identity policy does not accept it as the SEAD universal identity. Per FR-7, the system mints a new SEAD UUID. That UUID needs to be stored somewhere — but the current implementation has no column for it. The `external_id` field holds the business key. The `alloc_integer_id` holds the integer PK. The SEAD UUID itself has no column in the allocation table and no column in the entity table extension pattern.
 
-- `tbl_sites` does **not** depend directly on `tbl_locations`
-- the relationship is modeled through `tbl_site_locations`
-- this means site/location is an association, not a simple parent-child containment hierarchy
+Additionally, some SEAD tables already have `{entity}_uuid` columns (e.g. `tbl_sites.site_uuid`, `tbl_sample_groups.sample_group_uuid`). The earlier assessment flagged the risk of parallel identity columns (`{entity}_uuid` alongside `{entity}_external_id`). That risk remains.
 
-That matters because the aggregate design currently treats `location -> site` as a direct dependency. In the actual schema, that is not true.
+**To resolve:** decide whether `{entity}_external_id` is renamed to `{entity}_uuid`, whether the allocation table gains a `sead_uuid` column alongside `external_id`, or whether existing `{entity}_uuid` columns serve as the canonical SEAD universal identity. This must be settled before the DDL is final.
 
-This should be expanded into a broader modeling rule:
+### Gap 2: Tracked entity enumeration is still deferred
 
-- the system must allow **many-to-many relationships between entities**,
-- the design must distinguish between **provider data** and **shared SEAD metadata / classifiers**,
-- some things can be entities and still function as shared metadata rather than provider-owned data.
+The requirements correctly state that determining which SEAD objects qualify as tracked entities is a domain-modeling task. The implementation view picks five pilot tables for Phase 2, but that is rollout planning, not a design decision.
 
-That distinction is important in SEAD. For example:
+Until the tracked entity list exists, no one can:
 
-- `Location` is an entity, but it is also shared metadata,
-- `Site` may also be treated as shared metadata rather than provider-owned data,
-- `Bibliographies`, `Taxa Tree`, `Methods`, and `Sample Type` are all examples of metadata or classifier structures that need reconciliation rather than naive duplication.
+- verify that the aggregate boundaries make sense,
+- define business-key rules per entity type,
+- write the entity table extension migrations,
+- test reconciliation for shared metadata entities.
 
-This implies a design requirement that is not yet fully expressed in the current drafts:
+This is the single largest prerequisite blocking implementation.
 
-- provider-specific data and shared SEAD reference structures should not be modeled the same way,
-- classifiers and metadata need explicit reconciliation workflows,
-- the aggregate model must support associations between entities, not only parent-child ownership chains.
+### Gap 3: Aggregate boundaries are undefined
 
-So the statement that `Location` is the aggregate root for `Site` should be treated as a flaw in the current realization of the aggregate model, not as a settled design decision.
+The design rules say value objects are aggregate state, not identity targets (Design Rule 1). The requirements define the entity/value-object distinction. But no document says which SEAD tables are aggregate roots and which are owned children.
 
-### 2. Some implementation assumptions duplicate or conflict with existing SEAD columns
+Without this:
 
-The implementation draft proposes adding `{entity}_external_id` columns to pilot tables. That should be revised.
+- update semantics ("replace children") cannot be implemented,
+- content hashing cannot define its scope,
+- the system cannot distinguish an entity that needs identity from a child row that does not.
 
-But the actual schema already includes UUIDs on at least some core tables:
+### Gap 4: Reconciliation mechanics are unspecified
 
-- `tbl_sites.site_uuid`
-- `tbl_sample_groups.sample_group_uuid`
+FR-17 requires reconciliation of shared metadata. FR-20 requires surfacing unresolved state. But the implementation view contains no reconciliation operation.
 
-If the design adds parallel `site_external_id` and `sample_group_external_id` columns, then these tables would effectively have two competing external identity columns.
+The core operations are: allocate, resolve, commit, rollback, detect-change. None of these describes how reconciliation actually works:
 
-That creates design ambiguity:
+- What matching rules apply? (exact match, fuzzy, configurable per entity type?)
+- Who resolves unresolved state? (automated retry, manual curation queue, API callback?)
+- Where is unresolved state stored? (a status on the allocation record, a separate table?)
 
-- Which one is canonical?
-- Are old UUIDs aliases or the main identity?
-- If both are kept, how are they synchronized?
+For provider-owned entities, the allocate-or-resolve flow is sufficient. For shared metadata entities, it is not. Reconciliation is a different operation that needs its own specification.
 
-This should be resolved before implementation, and I agree with the refinement:
+### Gap 5: Business-key serialization rules are undefined
 
-- there should be no separate `{entity}_external_id` column family,
-- the table-level stable identifier should be `{entity}_uuid`,
-- existing UUID columns in SEAD should be reused rather than paralleled.
+The implementation view acknowledges this (Open Question 1) and provides a placeholder format (`"LAB_123|SITE_A|2024"`). But for business-key resolution to work, serialization rules must be defined per entity type: which fields, what order, what delimiter, what normalization (case, whitespace, encoding).
 
-For user data, the most coherent rule is:
+Without these rules, two submissions of the same entity with the same business key could produce different serialized representations, defeating idempotency.
 
-- if the provider supplies a UUID and SEAD accepts it, use that UUID,
-- otherwise mint the UUID in SEAD,
-- in the long term, providers may be required to supply UUIDs.
+### Gap 6: Content-hash aggregate scope is undefined
 
-That is a cleaner direction than introducing another external-id column set. It also means the real design question shifts from column naming to governance:
+The implementation view acknowledges this (Open Question 3). The detect-change operation compares hashes, but there is no specification of what gets hashed.
 
-- when is a provider UUID accepted as the SEAD UUID,
-- when is a SEAD UUID minted instead,
-- and how are remote identifiers retained in the identity system when they are not promoted into SEAD itself.
+The earlier assessment identified the required decisions: which child rows, which fields, normalization rules, ordering, and whether associations count. Those decisions still need to be made against actual SEAD aggregate definitions — which depend on Gap 3.
 
-### 3. The design still conflates several different identity notions
+### Gap 7: Identity policy model is unspecified
 
-The documents currently blur together:
+FR-11 requires administrable identity policy. The systems design says policy is applied at the boundary between Resolve and Allocate and may vary by entity type. But no document specifies how policy is represented, stored, or administered.
 
-- the SEAD integer primary key,
-- the SEAD UUID identity,
-- business or natural keys,
-- provider-side internal or external keys,
-- third-party authority identifiers.
+Is it a configuration file? A database table? An API-managed resource? What are the policy parameters? This does not need to be over-engineered, but it needs at least a candidate structure.
 
-Those are not necessarily the same thing.
+### Gap 8: Entity metadata storage is undecided
 
-This is the most important design issue still unresolved.
+SIMS needs to know which SEAD tables are tracked entities, their subtypes, aggregate boundaries, and FK relationships. This metadata is required for topological sorting, submission validation, allocation ordering, and reconciliation rules.
 
-In particular:
+Shape Shifter's target model (`sead_standard_model.yml`) already catalogues 47 SEAD entities with role, foreign keys, identity columns, column specs, and unique sets. That metadata overlaps substantially with what SIMS needs.
 
-- a provider UUID may be acceptable as the stable SEAD UUID in some cases,
-- but the design must say when that is allowed,
-- and it must still handle cases where multiple provider identities or authority identifiers point at the same SEAD entity.
+The design question is: **should SIMS maintain its own entity registry, or consume Shape Shifter's target model spec?**
 
-If multiple providers can point at the same underlying entity, then SEAD needs a stable identity of its own, and provider identifiers should be treated as aliases or mappings to that identity.
+An earlier design produced a three-table aggregate model (entity_types, aggregate_definitions, entity_dependencies) with views and PL/pgSQL functions. That design was retired as premature and largely redundant with the target model. The useful SQL patterns are preserved in `src/sql/entity_metadata_functions.sql`; the retired documents are in `docs/ignore/`.
 
-The clearest next step is to define the terms explicitly. A good working vocabulary is:
+This decision affects Gaps 2 (tracked entity enumeration), 3 (aggregate boundaries), and 5 (business-key rules). It should be resolved early.
 
-- **SEAD internal identity**: the current serial or sequence-backed primary key, entity-scoped, relational, never exposed as the public identity.
-- **SEAD universal identity**: the new UUID identity, exposed externally and accepted externally, globally scoped.
-- **Business keys**: combinations of fields that uniquely identify an entity in practice, often used for reconciliation. These are natural keys and must be defined per entity type.
-- **Remote-system keys**: the provider's own internal, external, or business identifiers. These should generally live in the identity system rather than directly in SEAD tables.
-- **Authority keys**: identifiers from external authority systems such as Wikidata, GeoNames, or domain ontologies. These are especially valuable because they can greatly improve reconciliation quality.
-
-This terminology is more precise than the current drafts and better reflects the actual problem space.
-
-### 4. Update semantics are still underspecified
-
-The intended behavior is clear at a high level:
-
-- entity rows are updated,
-- children are replaced.
-
-But the current drafts do not yet define this precisely enough to implement safely.
-
-The missing pieces are:
-
-- which tables are aggregate roots,
-- which tables are owned child value objects,
-- which tables are associations rather than owned children,
-- what exactly counts as the aggregate payload for hashing and change detection,
-- what replacement means operationally: delete-all-and-reinsert, soft replace, versioned replace, or diff-based replace.
-
-Without this, the identity model is correct in principle but incomplete in execution terms.
-
-I agree with the conclusion here: this work should be completed before implementation planning resumes.
-
-At this stage, stashing the implementation plan is the right move. The project should focus first on:
-
-- the system design,
-- the SEAD entity model,
-- the aggregate model,
-- ownership versus association,
-- and reconciliation rules for shared metadata.
-
-### 5. Content-hash based change detection is still only a placeholder
-
-Storing `content_hash` is a useful idea, but the current design does not yet define the critical rule that makes hashes trustworthy:
-
-**What is the canonical serialized representation of an aggregate?**
-
-Until that is specified, hashes are not stable enough to drive updates.
-
-For example, the design still needs rules for:
-
-- ordering of child rows,
-- null normalization,
-- whitespace normalization,
-- excluded metadata fields,
-- whether associations like location links are inside or outside the aggregate boundary.
-
-This also supports the decision to postpone implementation planning. Until aggregate serialization is formally defined, the hashing part of the design is still conceptual.
-
-### 6. The aggregate model may be slightly over-engineered for the current maturity level
-
-The generic aggregate metadata model is well thought through, but it may be ahead of the more fundamental design decisions.
-
-Tables such as:
-
-- `entity_types`
-- `aggregate_definitions`
-- `entity_dependencies`
-
-are useful, but they only help once the aggregate boundaries are settled against the real SEAD schema.
-
-Right now, the design still needs clarification on the domain model itself. Until that is stable, metadata-driven orchestration may add complexity earlier than necessary.
-
-### 7. The implementation/NFR drafts are more mature than the domain model
-
-The SIMS documentation includes detailed operational targets, infrastructure choices, and API/security patterns. That is good work, but the design maturity is uneven.
-
-The domain questions are still more urgent than the operational ones.
-
-For example, targets like:
-
-- very high throughput,
-- replica strategies,
-- OAuth flows,
-- bulk API performance goals
-
-are secondary until the system clearly defines what constitutes an entity identity, an aggregate, an owned child, and an update.
-
-This is not wrong, but it indicates the design effort is currently slightly inverted.
-
-I would therefore explicitly recommend that the implementation plan be treated as **parked** until:
-
-- the SEAD entity model is defined,
-- the aggregate model is revised against the real schema,
-- metadata versus provider data is modeled explicitly,
-- and the identity vocabulary is fixed.
+See [IMPLEMENTATION_VIEW.md](./IMPLEMENTATION_VIEW.md) § Entity Metadata for the candidate options.
 
 ---
 
-## Schema-Based Observations That Should Influence The Design
+## What Has Improved Since The Earlier Assessment
 
-### 1. Site and location are associated, not strictly nested
-
-The current schema uses `tbl_site_locations` as a join table.
-
-That means:
-
-- `location` should probably not be modeled as a strict parent aggregate of `site`,
-- instead, `site` and `location` may need separate identities with an association between them,
-- or the model must explicitly explain why one is treated as primary despite the relational structure.
-
-This is a significant modeling issue, not a minor documentation detail.
-
-### 2. Shared metadata and classifiers need their own design treatment
-
-The system also needs a stronger distinction between:
-
-- provider-owned data,
-- shared metadata,
-- common classifiers,
-- and authority-linked reference structures.
-
-This matters because a large part of SEAD's value lies in common classifiers that support cross-dataset comparison. That means the identity system cannot only think in terms of provider-owned aggregates. It must also support reconciliation against shared SEAD reference structures.
-
-This affects entities such as:
-
-- locations,
-- sites,
-- bibliographies,
-- taxa,
-- methods,
-- sample types,
-- and other classifier-like metadata.
-
-Some of these are entities. Some are metadata. Some are both. The design therefore needs a more nuanced model than a simple “aggregate root versus child value object” split.
-
-### 3. `tbl_analysis_entities` uses `bigint`
-
-The design often speaks in terms of integer identifiers generally, but in the actual DDL:
-
-- `tbl_analysis_entities.analysis_entity_id` is `bigint`
-
-That does not invalidate the approach, but it means the implementation text should avoid being overly specific about `integer` where the schema already varies.
-
-### 4. UUID adoption in SEAD is partial, not uniform
-
-SEAD already contains UUID use in some places, including some tables relevant to this design. That is important because it means:
-
-- the identity-system proposal is not starting from zero,
-- there is already precedent for UUID in SEAD,
-- migration strategy should reuse that precedent rather than introduce parallel identity columns casually,
-- and the canonical table-level public identifier should probably standardize on `{entity}_uuid` rather than a new external-id naming scheme.
-
-### 5. BUGS/CEP proves the need for traceability, but not the final model
-
-The existing `bugs_trace` design is valuable because it demonstrates:
-
-- mappings between external and SEAD rows are necessary,
-- update/audit history matters,
-- serialized source payloads are useful for trace/debug.
-
-But it is also a warning:
-
-- row-level serialized trace data alone is not a robust aggregate identity model,
-- audit logging and identity mapping should not be conflated too tightly,
-- the new system should preserve the traceability benefit without inheriting an overly row-centric design.
+| Earlier finding | Current status |
+|-----------------|----------------|
+| Identity terminology is blurred | Fixed. Five identity types clearly defined. |
+| No entity subtypes for shared metadata | Fixed. Provider-owned / shared metadata / relationship subtypes defined. |
+| No requirement for administrable identity policy | Fixed. FR-11 added. |
+| No requirement for surfacing unresolved state | Fixed. FR-20 added. |
+| Location/site forced into ownership hierarchy | Fixed. Association relationship type introduced, FR-18 supports many-to-many. |
+| Documents redundant and inconsistent | Fixed. Three-document chain is clean, DRY, and properly cross-referenced. |
+| Implementation detail mixed with design | Fixed. Clear separation across three documents. |
+| Aggregate model metadata tables premature | Fixed. Retired to `docs/ignore/`. Useful SQL preserved in `src/sql/entity_metadata_functions.sql`. Design question recorded as Gap 8. |
+| NFRs more mature than domain model | Fixed. NFR material stashed. Implementation view is proportionate to design maturity. |
 
 ---
 
-## Upsides Of The Current Direction
+## What Remains From The Earlier Assessment
 
-If refined, the current design has several strong advantages.
-
-### Upside 1: It solves the real integration problem without breaking SEAD
-
-Keeping existing PKs while adding a stable identity layer is the least disruptive path.
-
-### Upside 2: It supports idempotent ingestion
-
-This is probably the single most valuable operational gain.
-
-### Upside 3: It creates a credible basis for update workflows
-
-The entity/value-object distinction gives a clean conceptual model for updates.
-
-### Upside 4: It supports multiple provider maturity levels
-
-UUID-capable and legacy providers can both participate.
-
-### Upside 5: It is compatible with future change detection and provenance
-
-The allocation table plus content hashes and submission tracking provide a good base for later evolution.
+| Earlier finding | Current status |
+|-----------------|----------------|
+| Tracked entity list not defined | Still deferred (Gap 2). |
+| Aggregate boundaries not grounded in DDL | Still undefined (Gap 3). |
+| Existing UUID columns risk parallel identity mechanisms | Still unresolved (Gap 1). |
+| Content-hash serialization unspecified | Still open (Gap 6). |
+| Rollback vs identity permanence unclear | Partially addressed. Implementation view defines soft/hard delete. But the design-level permanence rule is still unstated. |
 
 ---
 
-## Downsides And Risks In The Current Direction
+## Implementation-Readiness Verdict
 
-### Downside 1: Risk of duplicate identity mechanisms
+The proposal is now at a **late design** stage. The conceptual model is sound and internally consistent. The implementation structures are concrete and plausible. But the design depends on domain-modeling inputs that do not yet exist.
 
-If SEAD keeps existing UUID columns, adds new identity columns, and also keeps a central mapping table, the system may end up with overlapping identity mechanisms unless one is defined as canonical.
+**Ready for implementation:**
 
-### Downside 2: Aggregate boundaries are not settled enough yet
+- The allocation registry schema and operations (modulo Gap 1).
+- The submission lifecycle and API surface.
+- Phase 1 infrastructure deployment (schema, functions, API shell).
+- The rollout phasing strategy.
 
-If aggregate boundaries are wrong, update behavior will be wrong.
+**Not ready for implementation:**
 
-### Downside 3: Natural keys can become unstable
+- Entity table extensions (depends on tracked entity list and UUID column strategy).
+- Business-key resolution (depends on serialization rules per entity type).
+- Reconciliation for shared metadata (not yet specified).
+- Content-hash change detection (depends on aggregate boundary definitions).
+- Identity policy administration (no candidate structure).
 
-Natural keys are useful, but only if the design defines:
+**Recommended path to implementation-readiness:**
 
-- provider namespace,
-- normalization rules,
-- mutability rules,
-- collision handling,
-- versioning behavior when a business key changes.
+1. Enumerate tracked entities against the real SEAD DDL.
+2. Define aggregate boundaries (which tables are roots, which are owned children, which are associations).
+3. Resolve the UUID column question: reuse existing `{entity}_uuid`, rename `{entity}_external_id`, or add `sead_uuid` to the allocation table.
+4. Specify reconciliation mechanics for shared metadata entities.
+5. Define business-key rules for at least the five pilot entity types.
+6. State the identity permanence rule (are issued identities ever reusable?).
 
-### Downside 4: Direct table-level identity mapping can be too rigid
-
-If the identity layer is modeled only as `identifier -> specific SEAD table row`, the system may become harder to evolve when:
-
-- entities migrate across table structures,
-- multiple providers refer to one canonical entity,
-- one provider changes its own identifiers,
-- authority identifiers need to be attached alongside provider identifiers.
-
-### Downside 5: Rollback and identity permanence need clearer rules
-
-The docs mention rollback, but identity allocation and business rollback are different concerns.
-
-The design should decide whether a once-issued identity is:
-
-- never reused,
-- invalidated but still reserved,
-- or fully removed in some cases.
-
-My recommendation is that issued identities should generally remain immutable and non-reusable, even when business data is withdrawn.
+Steps 1–3 are prerequisites for any entity-table work. Steps 4–6 can proceed in parallel with Phase 1 infrastructure.
 
 ---
 
-## Assessment Of Increased UUID Use
+## Readiness Checklist
 
-Using UUID more broadly is a good idea, but only if it is done with a clear identity model.
+Each item must be completed and recorded in the appropriate document before the system can be considered implementation-ready. Items are grouped by dependency: complete each group before starting the next.
 
-### Where UUID helps
+### Group A: Domain Modeling (prerequisites for everything else)
 
-UUID is a good fit for:
+- [ ] **A1. Enumerate tracked entities.** Produce a table listing every SEAD table that qualifies as a tracked entity (aggregate root). For each, state: table name, entity subtype (provider-owned, shared metadata, or relationship), and rationale for inclusion. Record in IMPLEMENTATION_VIEW.md or a new TRACKED_ENTITIES.md.
+- [ ] **A2. Define aggregate boundaries.** For each tracked entity, list the child tables whose rows are owned value objects (replaced on update, no independent identity). State which child tables are excluded and why. Record alongside A1.
+- [ ] **A3. Identify associations.** For each tracked entity, list relationships that are associations (many-to-many or cross-aggregate references) rather than ownership. Include the join table and both referenced entities. The site/location relationship via `tbl_site_locations` is the canonical example.
+- [ ] **A4. Classify shared metadata entities.** For each shared-metadata entity (locations, bibliographies, taxa, methods, sample types, etc.), state whether it is reconciled against existing SEAD records, allocated fresh per submission, or handled by a different rule. Record the classification and the matching criteria.
 
-- stable public identifiers,
-- provider-generated identifiers,
-- cross-system references,
-- offline allocation,
-- long-lived links that must survive integer PK drift.
+### Group B: Identity Model (depends on A1)
 
-### Where UUID should not replace integers
+- [ ] **B1. Resolve the UUID column question.** Decide one of: (a) reuse existing `{entity}_uuid` columns as the canonical SEAD universal identity, (b) rename the proposed `{entity}_external_id` to `{entity}_uuid`, or (c) add a `sead_uuid` column to the allocation table. Document the decision and update IMPLEMENTATION_VIEW.md DDL accordingly.
+- [ ] **B2. Reconcile with existing UUID columns.** For tables that already have `{entity}_uuid` columns (`tbl_sites.site_uuid`, `tbl_sample_groups.sample_group_uuid`, etc.), state how existing values are treated: migrated into the allocation registry, kept as-is, or deprecated. Document the migration strategy.
+- [ ] **B3. State the identity permanence rule.** Define whether a once-issued SEAD identity (integer PK + UUID) can ever be reused, invalidated, or hard-deleted. State the rule for each of: normal rollback, administrative correction, and entity merge. Record in REQUIREMENTS.md or DESIGN_VIEW.md.
 
-I do **not** think the design should replace SEAD primary keys with UUID throughout the schema.
+### Group C: Business-Key Resolution (depends on A1, A4)
 
-The current proposal is right to keep relational PK/FK structure largely intact.
+- [ ] **C1. Define business-key fields per entity type.** For each tracked entity, list the fields that constitute its business key. State the field names, their order, and whether each field is required or optional.
+- [ ] **C2. Define serialization rules.** Specify the canonical serialization format for business keys: delimiter, encoding, case normalization, whitespace handling, null representation. The format must be deterministic so that identical business data always produces the same serialized key.
+- [ ] **C3. Define collision handling.** State what happens when two different submissions produce the same serialized business key for what appears to be different data. Options include: reject the second submission, flag for manual review, or treat as an update.
 
-### The key design question
+### Group D: Reconciliation (depends on A4, C1)
 
-The critical question is not whether UUID should be used. It should.
+- [ ] **D1. Specify reconciliation operations.** Define the reconciliation flow for shared metadata entities as a named operation (distinct from allocate/resolve). State the inputs (entity type, candidate data, matching criteria), outputs (matched SEAD record or unresolved state), and side effects (allocation record creation).
+- [ ] **D2. Define matching rules per entity type.** For each shared-metadata entity, state the matching rule: exact match on business key, fuzzy match with threshold, configurable match, or manual curation. If fuzzy, define the similarity metric and threshold.
+- [ ] **D3. Specify unresolved-state handling.** Define where unresolved reconciliation state is stored (allocation record status, separate table, or both), who is responsible for resolving it (automated retry, manual curation queue, API callback to provider), and what the submission's status is while the state is unresolved.
 
-The real question is:
+### Group E: Change Detection (depends on A2, A3)
 
-**When does a provider UUID become the SEAD UUID, and when must SEAD mint one instead?**
+- [ ] **E1. Define aggregate payload scope.** For each tracked entity, state exactly which fields and child rows are included in the content hash. State whether association records (e.g., site-location links) are included.
+- [ ] **E2. Define hash serialization rules.** Specify canonicalization: field ordering, child-row ordering, null handling, numeric precision, text encoding. The serialization must be deterministic across platforms.
+- [ ] **E3. Define change-detection response.** State what the system does when a hash mismatch is detected: flag for review, auto-update, or require explicit update request. State whether partial changes (some children changed, root unchanged) are supported.
 
-That distinction must be made explicit.
+### Group F: Identity Policy (can proceed in parallel with B–E)
 
----
+- [ ] **F1. Define policy representation.** State how identity policy is stored and administered: configuration file, database table, or API-managed resource. Provide a candidate schema or structure with at least the fields needed to express "accept provider UUID as SEAD identity for entity type X."
+- [ ] **F2. Define policy parameters.** List the parameters that policy controls, at minimum: UUID acceptance (accept/mint/reject), business-key acceptance, per-entity-type overrides. State default values.
+- [ ] **F3. Define policy administration.** State who can modify policy (roles/permissions), how changes take effect (immediate, next submission, versioned), and whether policy changes are audited.
 
-## Recommended UUID Strategy
+### Group G: DDL and Migration Finalization (depends on A–F)
 
-My recommendation is a **two-layer model** for tracked aggregate entities, with explicit room for business keys and authority keys:
-
-### Option A: Minimal model
-
-- Keep SEAD integer PKs as they are.
-- Reuse or add one canonical `{entity}_uuid` for each tracked aggregate entity.
-- Accept provider UUID where appropriate; otherwise mint the UUID in SEAD.
-- Store provider identifiers, business keys, and authority keys in the identity system as mappings or aliases.
-
-This gives SEAD a stable public identity while still accepting robust provider identifiers.
-
-### Why this is better than using provider UUID directly as SEAD identity
-
-Because it keeps the design safe if:
-
-- multiple providers refer to the same entity,
-- a provider changes its own identifier policy,
-- SEAD merges or reconciles records from different sources,
-- authority keys are attached later.
-
-### Practical rule
-
-For each tracked entity, distinguish clearly between:
-
-- `sead_id`: current relational PK in SEAD
-- `entity_uuid`: canonical stable SEAD identity for the aggregate
-- `business_key`: natural key used for reconciliation
-- `provider_keys`: provider-side identities retained in the identity system
-- `authority_keys`: external authoritative identifiers when available
-
-This is more explicit than the current proposal, but it fits the problem better.
-
-### If simplicity is the highest priority
-
-If you want the leanest possible first version, then:
-
-- use UUID as the canonical identity for aggregate roots,
-- let provider UUID be reused directly when SEAD accepts it,
-- mint UUID in SEAD when the provider has none,
-- keep a mapping layer for business keys and future aliasing.
-
-That can work, but it should be treated as a deliberate simplification, not as a universally correct model.
+- [ ] **G1. Finalize allocation registry DDL.** Update `identity_allocations` table definition in IMPLEMENTATION_VIEW.md to reflect B1 (UUID column decision) and any changes from D1 (reconciliation status).
+- [ ] **G2. Finalize entity table extensions.** For each pilot entity, produce the `ALTER TABLE` migration adding the required columns. Confirm column names and types against B1 and B2.
+- [ ] **G3. Write Sqitch migration plan.** Produce the ordered list of Sqitch change sets for Phase 1 (infrastructure) and Phase 2 (pilot entities). Each change set should reference the design decision it implements.
+- [ ] **G4. Validate against real SEAD DDL.** Run the proposed migrations against a copy of the production schema. Confirm no conflicts with existing columns, constraints, or triggers.
 
 ---
 
-## What Should Be Clarified Before Implementation
+## Relationship To Other Documents
 
-The next design pass should answer these questions explicitly.
-
-### 1. Which SEAD tables are tracked entities?
-
-Produce a final list of aggregate roots grounded in the real DDL, not only in conceptual workflow.
-
-### 2. Which child tables are owned value objects?
-
-For each aggregate, list the child tables that are replaced on update.
-
-### 3. Which relations are associations rather than ownership?
-
-This is especially important for site/location and other cross-cutting relationships.
-
-### 4. What is the canonical SEAD stable identity?
-
-Decide when SEAD accepts a provider UUID as the canonical `{entity}_uuid`, and when SEAD mints its own.
-
-### 5. What is the canonical aggregate serialization for hashing?
-
-Without this, change detection remains conceptual only.
-
-### 6. How should existing UUID columns be treated?
-
-Decide how existing UUID columns like `site_uuid` and `sample_group_uuid` are reused as the canonical table-level UUID fields.
-
-### 7. What are the permanence rules for allocated identities?
-
-Clarify whether rollback affects only submitted business data, or identity allocations as well.
-
-### 8. Which keys stay out of SEAD proper?
-
-Decide which provider-side keys and remote business keys are kept only in the identity system rather than ingested into SEAD tables.
-
-### 9. How are authority keys represented?
-
-Define how identifiers from authority systems such as Wikidata, GeoNames, and domain ontologies are stored and used in reconciliation.
-
----
-
-## Final Judgement
-
-The current system description is promising and directionally correct.
-
-Its core strengths are:
-
-- correct identification of the real problem,
-- a sound aggregate-focused identity strategy,
-- pragmatic support for both UUID and natural keys,
-- a good architectural boundary between SIMS and Shape Shifter.
-
-Its main weaknesses are:
-
-- incomplete alignment with the real SEAD schema,
-- unresolved distinction between canonical SEAD identity and provider identity,
-- insufficiently specified update semantics,
-- a risk of introducing overlapping identity mechanisms,
-- an insufficient distinction between provider data and shared metadata/classifiers.
-
-So the current design should be treated as:
-
-**A strong draft architecture that is ready for refinement, but not yet ready for direct implementation without another round of schema-grounded design clarification.**
-
-I also think it is correct to **stash the implementation plan for now**. The next phase should be design-only work focused on:
-
-- developing the SEAD entity model,
-- revising the aggregate model,
-- separating provider data from shared metadata and classifiers,
-- defining identity terminology,
-- and specifying update/reconciliation semantics.
-
-If that design pass succeeds, the later implementation plan will be much smaller, more coherent, and substantially safer to execute.
+- [REQUIREMENTS.md](./REQUIREMENTS.md) — what the system must do.
+- [DESIGN_VIEW.md](./DESIGN_VIEW.md) — design rules and architectural decisions.
+- [IMPLEMENTATION_VIEW.md](./IMPLEMENTATION_VIEW.md) — implementation structures, storage design, and rollout strategy.

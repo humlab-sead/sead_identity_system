@@ -7,8 +7,9 @@ This document states the initial functional requirements for the SEAD Identity S
 It is intentionally focused on:
 
 - why the system exists,
-- what capabilities it must provide,
-- and how those capabilities should surface at a high level through an API.
+- the domain concepts the system must understand,
+- what the system must do (functional requirements),
+- and how the system should surface to clients at a high level through an API.
 
 ### Out Of Scope For This Document
 
@@ -21,7 +22,7 @@ AI agents, take notice! The following are **out of scope** for this document, an
 - infrastructure architecture,
 - performance targets,
 - authentication details,
-- endpoint endpoint-level contracts or payload definitions,
+- endpoint-level contracts or payload definitions,
 - database migration steps,
 - rollout plans,
 - code-level hashing or serialization rules.
@@ -59,13 +60,7 @@ The system must therefore support both of the following at the same time:
 
 ### Scope
 
-The SEAD Identity System is concerned with identity management for tracked SEAD entities and with the mapping between:
-
-- SEAD internal identities,
-- SEAD universal UUID identities,
-- provider identities,
-- business keys,
-- and relevant (external) authority keys.
+The SEAD Identity System is concerned with identity management for tracked SEAD entities and with the mapping between the identity types defined in [Domain Concepts](#domain-concepts) below.
 
 The system is also concerned with the relationship between provider-specific data and shared SEAD metadata, including reconciliation where those overlap.
 
@@ -99,7 +94,8 @@ Characteristics:
 - integer sequences, 
 - relational,
 - internal to SEAD,
-- should **not** be exposed as an public identity.
+- should **not** be exposed as a public identity.
+- represented in SEAD as `{entity}_id` where applicable.
 
 #### SEAD universal identity
 
@@ -145,52 +141,53 @@ Characteristics:
 - not always available from providers,
 - may become strategically important for shared SEAD entities.
 
-### Entity categories
+### Entity and value object distinction
 
-The system must distinguish at least three categories of domain objects.
+This document uses definitions grounded in domain-driven design.
 
-#### Tracked entities
+**An entity** is a domain object that:
 
-Entities for which SEAD must manage stable identity.
+- has stable identity that persists across state changes, submissions, and system boundaries,
+- can be uniquely identified independent of its current attribute values,
+- has a meaningful lifecycle that may include creation, update, and deprecation,
+- can be referenced before its full state is known,
+- must be reconciled and de-duplicated when the same thing may arrive from multiple sources.
 
-TODO: define what a tracked SEAD entity **is**.
+**A value object** is a domain object that:
 
-Examples may include:
+- is defined entirely by its attributes,
+- is interchangeable with any other value object carrying the same attribute values,
+- has no independent lifecycle or stable identity,
+- belongs to an owning entity as part of that entity's aggregate state,
+- is replaced rather than independently updated or reconciled.
 
-- sites,
-- locations,
-- sample groups,
-- physical samples,
-- bibliographies,
-- taxa,
-- methods,
-- other shared reference entities.
+**A tracked entity** is an entity for which this system manages stable UUID identity. Not every domain object needs to be tracked. Determining which SEAD objects qualify as tracked entities is a SEAD domain-modeling task, deferred to SEAD model specification work. That work may draw on Shape Shifter's target model conformance definitions as an input.
 
-The final list is part of the domain-modeling work and is not fixed by this document.
+### Entity subtypes
 
-#### Shared metadata and classifiers
+Within tracked entities, this document recognizes three identity patterns.
 
-Reference structures used across datasets and providers.
+#### Provider-owned entities
 
-These are important because SEAD must reduce duplication and enable cross-dataset comparison. Some of these objects may also be tracked entities.
+Entities whose data originates from a submitting provider and is treated as provider-owned content. Identity is allocated based on incoming evidence. Reconciliation against shared SEAD structures is not the primary concern.
 
-Examples include:
+In Shape Shifter terms, these correspond broadly to **fact** entities.
 
-- locations,
-- sites,
-- bibliographies,
-- taxa,
-- methods,
-- sample types,
-- controlled vocabularies and classifiers.
+#### Shared metadata entities
 
-#### Value objects and owned child structures
+Entities that function as shared reference structures used across datasets and multiple providers. These must be reconciled against existing SEAD definitions rather than simply allocated a new identity. Insertion without reconciliation risks duplication.
 
-Objects that do not carry **independent identity** in the identity system.
+In Shape Shifter terms, these correspond broadly to **classifier** and **lookup** entities.
 
-TODO: What do we mean by **independent** entity.
+#### Relationship entities
 
-These belong to an owning entity and are managed as part of aggregate state rather than as independently reconciled identities.
+Some many-to-many associations are represented as bridge records. In most cases a bridge record is a value object owned by an aggregate. Where a bridge record carries its own attributes or lifetime that require independent tracking, it may qualify as a tracked entity.
+
+In Shape Shifter terms, these correspond to **bridge** entities.
+
+### Value objects and owned child structures
+
+Value objects belong to an owning entity and are managed as part of that entity's aggregate state. They do not receive stable identity and cannot be independently referenced or reconciled.
 
 ### Relationship types
 
@@ -209,110 +206,6 @@ This is important for relationships such as site-to-location where the schema ex
 #### Reconciliation linkage
 
 A provider object or classifier is matched to an existing SEAD object without implying ownership.
-
----
-
-## High Level Design
-
-### Design intent
-
-At a high level, the system should be understood as
- 1. a minting service for internal identities
- 2. and identity layer sitting between external provider workflows and the SEAD relational model
-
-That layer is responsible for:
-
-- deciding what kind of thing is being identified,
-- resolving or minting stable UUID identity,
-- mapping external identifiers and business keys,
-- preserving SEAD internal identifiers as implementation detail,
-- supporting later update logic.
-
-### Design principles
-
-#### 1. Preserve relational internals
-
-SEAD internal primary keys remain the relational backbone of the schema.
-
-#### 2. Expose stable UUID identity for tracked entities
-
-Tracked entities must have a stable external identity based on UUID.
-
-#### 3. Separate provider identity from SEAD identity
-
-A provider key is not automatically the same thing as a SEAD identity.
-
-The system must support both cases:
-
-- SEAD accepts a provider UUID as the SEAD UUID,
-- or SEAD mints the UUID and records the provider identity separately.
-
-#### 4. Manage metadata distinctly from provider-owned data
-
-Shared classifiers and reference entities require reconciliation and de-duplication, not only allocation.
-
-#### 5. Support associations as well as ownership
-
-The aggregate model must not assume that all  domain relationships are strict parent-child ownership chains.
-
-
-#### 7. AI Agent Notice: Use of auto-incremented sequences (serial) for tracked entities in SEAD must be prohibited
-
-Auto-incremented sequences are the root of all evil. Auto-incremental primary keys must not be allowed 
-for tracked entities, but might be accepted for non-tracked values in SEAD (sub-parts of entity aggregates).
-
----
-
-## Capabilities
-
-### What capabilities the system must provide
-
-This section describes required capabilities at a business and system level, not as API endpoints.
-
-### Identity management capabilities
-
-The system must be able to:
-
-1. Define which SEAD objects are identity-tracked entities.
-2. represent stable UUID identity for tracked entities.
-3. preserve the link between UUID identity and SEAD internal identity.
-4. resolve an incoming identifier to an existing SEAD identity where possible.
-5. mint a new SEAD UUID identity where no accepted identity exists.
-
-### Reconciliation capabilities
-
-The system must be able to:
-
-1. reconcile provider business keys against SEAD entities.
-2. reconcile provider classifiers against shared SEAD classifiers.
-3. attach authority identifiers where available.
-4. distinguish between direct allocation and reconciliation to an existing shared entity.
-
-### Submission capabilities
-
-The system must be able to:
-
-1. group related identity actions into a submission context.
-2. process repeated submissions idempotently.
-3. return stable identity results for the same accepted identifier across submissions.
-4. keep provider-side identity context for traceability.
-
-### Update-foundation capabilities
-
-The system must be able to:
-
-1. preserve enough identity state to support later update workflows.
-2. distinguish between identity tracking and business-data mutation.
-3. support future aggregate-level change evaluation.
-
-### Modeling capabilities
-
-The system must be able to:
-
-1. support ownership relationships,
-2. support many-to-many associations between tracked entities,
-3. support tracked entities that also function as shared metadata,
-4. support entities, metadata, and value objects as distinct concerns.
 
 ---
 
@@ -342,69 +235,60 @@ FR-9. The system shall retain provider keys in the identity system even when tho
 
 FR-10. The system shall support recording authority keys for tracked entities when such identifiers are available.
 
+FR-11. The system shall enforce an administrable identity policy that governs whether a provider-supplied UUID is accepted as the SEAD universal identity or treated only as a provider key.
+
 ### Idempotency and mapping requirements
 
-FR-11. The system shall return the same resolved SEAD identity for the same accepted identifier across repeated submissions.
+FR-12. The system shall return the same resolved SEAD identity for the same accepted identifier across repeated submissions.
 
-FR-12. The system shall prevent duplicate identity allocation for the same accepted identifier within the same identity scope.
+FR-13. The system shall prevent duplicate identity allocation for the same accepted identifier within the same identity scope.
 
-FR-13. The system shall support stable lookup of existing mappings between provider identifiers, business keys, authority keys, UUID identity, and SEAD internal identity.
+FR-14. The system shall support stable lookup of existing mappings between provider identifiers, business keys, authority keys, UUID identity, and SEAD internal identity.
 
 ### Domain modeling requirements
 
-FR-14. The system shall support tracked entities that are provider-owned data.
+FR-15. The system shall support tracked entities that are provider-owned data.
 
-FR-15. The system shall support tracked entities that are shared metadata.
+FR-16. The system shall support tracked entities that are shared metadata.
 
-FR-16. The system shall support reconciliation of shared metadata and classifiers rather than only raw insertion.
+FR-17. The system shall support reconciliation of shared metadata and classifiers rather than only raw insertion.
 
-FR-17. The system shall support many-to-many associations between tracked entities.
+FR-18. The system shall support many-to-many associations between tracked entities.
 
-FR-18. The system shall distinguish owned child value objects from independently tracked entities.
+FR-19. The system shall distinguish owned child value objects from independently tracked entities.
+
+FR-20. The system shall surface unresolved reconciliation state when an incoming shared metadata or classifier entity cannot be matched to an existing SEAD entity, rather than silently allocating a new identity.
 
 ### Submission and traceability requirements
 
-FR-19. The system shall group related identity actions under a submission concept.
+FR-21. The system shall group related identity actions under a submission concept.
 
-FR-20. The system shall preserve enough submission context to support auditing and traceability.
+FR-22. The system shall preserve enough submission context to support auditing and traceability.
 
-FR-21. The system shall preserve the relationship between a submission, the identifiers provided, and the resulting resolved or minted identities.
+FR-23. The system shall preserve the relationship between a submission, the identifiers provided, and the resulting resolved or minted identities.
 
-### Future-facing functional requirements
+### Update-foundation requirements
 
-FR-22. The system shall support later addition of aggregate-level update behavior.
+FR-24. The system shall maintain identity state sufficient for aggregate-level change detection and update workflows without requiring structural redesign of the identity model.
 
-FR-23. The system shall support later addition of aggregate-level change detection.
-
-FR-24. The system shall separate identity management rules from business-data update rules so those can evolve independently.
+FR-25. The system shall keep identity allocation logic independent of business-data mutation logic.
 
 ---
 
 ## Usage Scenarios
 
-### Scenario 1: Provider submits new user data with UUIDs
+### Scenario 1: Provider submits entity data
 
-A provider submits entities with provider-generated UUIDs.
-
-Expected outcome:
-
-- the system determines whether those UUIDs are accepted as SEAD universal identities,
-- resolves existing identities where present,
-- mints new UUID identities where needed,
-- returns stable mappings to SEAD internal identifiers.
-
-### Scenario 2: Provider submits user data without UUIDs
-
-A provider submits entities using business keys only.
+A provider submits entities, either with provider-generated UUIDs or using business keys only.
 
 Expected outcome:
 
-- the system uses defined business-key rules to reconcile or identify the entity,
-- if the entity is already known, its UUID identity is resolved,
-- if the entity is new, a SEAD UUID is minted,
-- the provider's business key is retained in the identity system.
+- Where UUIDs are supplied, the system determines whether they are accepted as SEAD universal identities per the configured identity policy.
+- Where only business keys are supplied, the system uses defined business-key rules to resolve or identify the entity.
+- In both cases, existing identities are resolved where found; new SEAD UUIDs are minted where not.
+- Provider keys are retained in the identity system regardless of whether they are accepted as SEAD identities.
 
-### Scenario 3: Provider submits classifiers that should reconcile to shared SEAD metadata
+### Scenario 2: Provider submits classifiers that should reconcile to shared SEAD metadata
 
 A provider submits values for methods, sample types, bibliographic references, taxa-related structures, or other classifiers.
 
@@ -415,17 +299,7 @@ Expected outcome:
 - if matched, the shared SEAD entity is reused,
 - if not matched, the system surfaces that unresolved state for later handling according to SEAD policy.
 
-### Scenario 4: Repeated submission of unchanged data
-
-The same provider submits the same entity again.
-
-Expected outcome:
-
-- the same accepted identifier resolves to the same stable SEAD identity,
-- the identity layer does not create a duplicate entity identity,
-- the submission remains traceable.
-
-### Scenario 5: Entity association rather than ownership
+### Scenario 3: Entity association rather than ownership
 
 Two independently tracked entities are linked, such as site and location.
 
@@ -435,7 +309,7 @@ Expected outcome:
 - the relationship is modeled as an association,
 - neither entity is forced into an incorrect ownership hierarchy purely for identity allocation convenience.
 
-### Scenario 6: Authority-backed reconciliation
+### Scenario 4: Authority-backed reconciliation
 
 A provider or curator supplies an authority identifier, such as a GeoNames or Wikidata identifier.
 
@@ -449,51 +323,7 @@ Expected outcome:
 
 ## High Level API Behaviour
 
-### How capabilities surface through the API
-
-The API should expose the identity system as a service that allows clients to:
-
-- present identity evidence,
-- ask for identity resolution or allocation,
-- submit related identity actions in a grouped context,
-- receive stable identity results,
-- inspect the outcome of reconciliation or allocation.
-
-This section is intentionally high-level. It describes API behavior, not endpoint design.
-
-### API behavior principles
-
-#### 1. The API should be identity-oriented, not table-script-oriented
-
-Clients should interact with the API in terms of tracked entities, identifiers, submissions, and reconciliation outcomes.
-
-#### 2. The API should separate identity resolution from business-data mutation
-
-The API should provide identity decisions and mappings without coupling those decisions to specific insert or update execution logic.
-
-#### 3. The API should support both resolution and allocation
-
-Clients should be able to ask:
-
-- does this identifier already correspond to a known SEAD entity,
-- or must a new SEAD identity be created?
-
-#### 4. The API should surface reconciliation outcomes explicitly
-
-When incoming data refers to shared metadata or classifiers, the API should be able to surface outcomes such as:
-
-- resolved to existing SEAD entity,
-- accepted provider UUID,
-- minted new SEAD UUID,
-- unresolved and requiring reconciliation policy.
-
-#### 5. The API should behave idempotently for accepted identifiers
-
-Repeated requests with the same accepted identifier evidence should yield the same identity result unless the system's policy or source mappings have been explicitly changed.
-
-#### 6. The API should preserve traceability
-
-The API should allow clients to associate identity actions with submission context and later retrieve the results of those identity decisions.
+The API exposes the identity system as a service. Clients present identity evidence, request resolution or allocation within a submission context, and receive stable identity results. Endpoint design belongs in a later API specification.
 
 ### API-visible concepts
 

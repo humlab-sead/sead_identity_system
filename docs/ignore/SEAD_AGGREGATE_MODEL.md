@@ -79,9 +79,6 @@ These entities depend on aggregates and don't require external IDs (use parent's
 | `horizon`                 | `tbl_horizons`              | `sample_group`     | `sample_group_id`   |
 | `analysis_value`          | `tbl_analysis_values`       | `analysis_entity`  | `analysis_entity_id`|
 | `analysis_note`           | `tbl_analysis_notes`        | `analysis_entity`  | `analysis_entity_id`|
-| `dendro`                  | `tbl_dendro`                | `physical_sample`  | `physical_sample_id`|
-| `ceramics`                | `tbl_ceramics`              | `physical_sample`  | `physical_sample_id`|
-| `isotope`                 | `tbl_isotopes`              | `analysis_entity`  | `analysis_entity_id`|
 
 **Rationale:** These are owned by aggregates and have no independent meaning. They inherit identity context from parents.
 
@@ -166,16 +163,7 @@ VALUES
      'Measured value from analysis'),
     
     ('analysis_note', 'Analysis Note', 'tbl_analysis_notes', 'analysis_note_id', FALSE, FALSE, 
-     'Annotation for analysis entity'),
-    
-    ('dendro', 'Dendrochronology', 'tbl_dendro', 'dendro_id', FALSE, FALSE, 
-     'Dendrochronological analysis of physical sample'),
-    
-    ('ceramics', 'Ceramics Analysis', 'tbl_ceramics', 'ceramics_id', FALSE, FALSE, 
-     'Ceramic material analysis of physical sample'),
-    
-    ('isotope', 'Isotope Analysis', 'tbl_isotopes', 'isotope_id', FALSE, FALSE, 
-     'Isotopic measurements from analysis');
+     'Annotation for analysis entity');
 ```
 
 ### Step 3: Define Dependencies (FK Relationships)
