@@ -1061,11 +1061,11 @@ GET /api/v1/identity/submissions/{submission_uuid}
 3. Backfill UUIDs (run during low-traffic hours)
    ```sql
    -- Example for batch backfill
-   UPDATE public.tbl_ceramics
-   SET ceramic_external_id = uuid_generate_v4()::TEXT,
-       ceramic_external_id_type = 'uuid'
-   WHERE ceramic_external_id IS NULL
-     AND ceramic_id BETWEEN 1 AND 100000;
+   UPDATE public.tbl_xyz
+   SET xyz_external_id = uuid_generate_v4()::TEXT,
+       xyz_external_id_type = 'uuid'
+   WHERE xyz_external_id IS NULL
+     AND xyz_id BETWEEN 1 AND 100000;
    ```
 
 4. Update views and stored procedures to handle external_id
