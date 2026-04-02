@@ -215,10 +215,10 @@ Each item must be completed and recorded in the appropriate document before the 
 
 ### Group A: Domain Modeling (prerequisites for everything else)
 
-- [ ] **A1. Enumerate tracked entities.** Produce a table listing every SEAD table that qualifies as a tracked entity (aggregate root). For each, state: table name, entity subtype (provider-owned, shared metadata, or relationship), and rationale for inclusion. Record in IMPLEMENTATION_VIEW.md or a new TRACKED_ENTITIES.md.
-- [ ] **A2. Define aggregate boundaries.** For each tracked entity, list the child tables whose rows are owned value objects (replaced on update, no independent identity). State which child tables are excluded and why. Record alongside A1.
-- [ ] **A3. Identify associations.** For each tracked entity, list relationships that are associations (many-to-many or cross-aggregate references) rather than ownership. Include the join table and both referenced entities. The site/location relationship via `tbl_site_locations` is the canonical example.
-- [ ] **A4. Classify shared metadata entities.** For each shared-metadata entity (locations, bibliographies, taxa, methods, sample types, etc.), state whether it is reconciled against existing SEAD records, allocated fresh per submission, or handled by a different rule. Record the classification and the matching criteria.
+- [x] **A1. Enumerate tracked entities.** Produce a table listing every SEAD table that qualifies as a tracked entity (aggregate root). For each, state: table name, entity subtype (provider-owned, shared metadata, or relationship), and rationale for inclusion. **Recorded in [TRACKED_ENTITIES.md](./TRACKED_ENTITIES.md) §2.**
+- [x] **A2. Define aggregate boundaries.** For each tracked entity, list the child tables whose rows are owned value objects (replaced on update, no independent identity). State which child tables are excluded and why. **Recorded in [TRACKED_ENTITIES.md](./TRACKED_ENTITIES.md) §3.**
+- [x] **A3. Identify associations.** For each tracked entity, list relationships that are associations (many-to-many or cross-aggregate references) rather than ownership. Include the join table and both referenced entities. The site/location relationship via `tbl_site_locations` is the canonical example. **Recorded in [TRACKED_ENTITIES.md](./TRACKED_ENTITIES.md) §4.**
+- [x] **A4. Classify shared metadata entities.** For each shared-metadata entity (locations, bibliographies, taxa, methods, sample types, etc.), state whether it is reconciled against existing SEAD records, allocated fresh per submission, or handled by a different rule. **Recorded in [TRACKED_ENTITIES.md](./TRACKED_ENTITIES.md) §5.**
 
 ### Group B: Identity Model (depends on A1)
 
@@ -228,7 +228,7 @@ Each item must be completed and recorded in the appropriate document before the 
 
 ### Group C: Business-Key Resolution (depends on A1, A4)
 
-- [ ] **C1. Define business-key fields per entity type.** For each tracked entity, list the fields that constitute its business key. State the field names, their order, and whether each field is required or optional.
+- [x] **C1. Define business-key fields per entity type.** For each tracked entity, list the fields that constitute its business key. State the field names, their order, and whether each field is required or optional. **Recorded in [TRACKED_ENTITIES.md](./TRACKED_ENTITIES.md) §2 (business key column).**
 - [ ] **C2. Define serialization rules.** Specify the canonical serialization format for business keys: delimiter, encoding, case normalization, whitespace handling, null representation. The format must be deterministic so that identical business data always produces the same serialized key.
 - [ ] **C3. Define collision handling.** State what happens when two different submissions produce the same serialized business key for what appears to be different data. Options include: reject the second submission, flag for manual review, or treat as an update.
 

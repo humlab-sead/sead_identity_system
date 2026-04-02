@@ -15,6 +15,9 @@ SIMS is a separate SEAD-side system. It does not live inside Shape Shifter. The 
 - [ASSESSMENT.md](./ASSESSMENT.md)
   Design assessment, strengths, weaknesses, and open issues.
 
+- [TRACKED_ENTITIES.md](./TRACKED_ENTITIES.md)
+  Entity register: enumeration, aggregate boundaries, associations, reconciliation strategies, and business keys.
+
 - [IMPLEMENTATION_VIEW.md](./IMPLEMENTATION_VIEW.md)
   Implementation structures, storage design, and rollout strategy.
 
