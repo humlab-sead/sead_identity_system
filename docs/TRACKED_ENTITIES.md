@@ -15,13 +15,13 @@ This document enumerates the SEAD entities relevant to the SIMS identity system.
 
 ### Terminology
 
-| Term | Definition | Source |
-|------|------------|--------|
-| Provider-owned | Data originating from a provider submission | REQUIREMENTS.md §Entity Subtypes |
-| Shared metadata | Reference data shared across providers | REQUIREMENTS.md §Entity Subtypes |
-| Relationship | Association connecting two or more entities | REQUIREMENTS.md §Entity Subtypes |
-| TM Role | Target model role (`fact`, `lookup`, `classifier`, `bridge`) | sead_standard_model.yml |
-| Business key | The `identity_columns` field from the target model | sead_standard_model.yml |
+| Term            | Definition                                                   | Source                           |
+|-----------------|--------------------------------------------------------------|----------------------------------|
+| Provider-owned  | Data originating from a provider submission                  | REQUIREMENTS.md §Entity Subtypes |
+| Shared metadata | Reference data shared across providers                       | REQUIREMENTS.md §Entity Subtypes |
+| Relationship    | Association connecting two or more entities                  | REQUIREMENTS.md §Entity Subtypes |
+| TM Role         | Target model role (`fact`, `lookup`, `classifier`, `bridge`) | sead_standard_model.yml          |
+| Business key    | The `identity_columns` field from the target model           | sead_standard_model.yml          |
 
 ---
 
@@ -315,21 +315,21 @@ The following SEAD tables are visible in the ERD but absent from the Shape Shift
 ## 8. Summary
 
 | Category                              | Count  |
-|---------------------------------------|--------|
-| Provider-owned aggregate roots        | 4      |
-| Provider-owned aggregate children     | 5      |
-| Shared metadata — provider-extensible | 14     |
-| Shared metadata — SEAD-administered   | 20     |
-| Relationships (bridges)               | 6      |
+|---------------------------------------|-2      |
+| Provider-owned aggregate children     | 8      |
+| Shared metadata — provider-extensible | 12     |
+| Shared metadata — SEAD-administered   | 21     |
+| Relationships (bridges + other)       | 6      |
 | **Total (target model)**              | **49** |
 
 | Reconciliation Strategy   | Count |
 |---------------------------|-------|
-| allocate (fresh identity) | 9     |
-| reconcile-exact           | 12    |
-| reconcile-fuzzy           | 2     |
-| lookup-only               | 17    |
+| allocate (fresh identity) | 10    |
+| reconcile-exact           | 11    |
+| reconcile-fuzzy           | 1     |
+| lookup-only               | 18    |
 | lookup-extensible         | 3     |
+| derive (bridge/child)     | 3     |
 | derive (bridge)           | 6     |
 
 ---
